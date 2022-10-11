@@ -1,0 +1,17 @@
+{
+  "name": "audio-recorder-fe",
+  "version": "1.0.0",
+  "description": "Front end for audio recorder",
+  "author": "NathOrmond",
+  "private": true,
+  "scripts": {
+    "dev": "nuxt",
+    "build": "nuxt build",
+    "start": "nuxt start",
+    "generate": "nuxt generate"
+  },
+  "dependencies": {
+    "audio-recorder-vue": "^3.0.2",
+    "nuxt": "^2.0.0"
+  }
+}
