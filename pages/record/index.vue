@@ -96,19 +96,14 @@ const State = Object.freeze({ PRIOR: 1, RECORDING: 2, POST: 3 });
       */
       stopClicked: async function(){ 
         this.state = State.POST;
-        this.recorder.stop();
-        console.log(this.recorder)
-        console.log(this.audioData)
+        if(this.recorder !== undefined) this.recorder.stop();
         let audioBlob = new Blob( this.audioData, { 'type': 'audio/mp3;' });
-        console.log(audioBlob)
-
         let audioFormData = new FormData();
         audioFormData.append('audio', audioBlob); 
 
+        console.log('HERE!')
         // TODO: TEST API - REMOVE LATER
-        this.response = await axios.get('https://jsonplaceholder.typicode.com/todos/1');
-
-        console.log(audioFormData);
+        this.response = await axios.get(`/api/${this.urlEndpoints.record.mapping}`);
 
         // try{
         //   // Note axios only supports sending data in params on GET so use POST/PUT
@@ -123,19 +118,16 @@ const State = Object.freeze({ PRIOR: 1, RECORDING: 2, POST: 3 });
         //   console.log(e);
         // }
 
-        console.log(this.response);
-        console.log(this.response.data);
-
         /**
-         * Expected response format: 
-         * Duration, sample rate etc)
-         * {
-         *  "audio_received": bool, 
-         *  "duration": TIMESTAMP, 
-         *  sample_rate: long
-         * }
-         */
-
+        * Expected response format: 
+        * Duration, sample rate etc)
+        * {
+        *  "audio_received": bool, 
+        *  "duration": TIMESTAMP, 
+        *  sample_rate: long
+        * }
+        */
+        console.log(this.response);
       },
       /**
       * Reset any global vars here
