@@ -1,0 +1,9 @@
+{
+    "url": "http://172.0.0.1",
+    "record": {
+        "mapping": "record"
+    },
+    "stream": {
+        "mapping": "stream"
+    }
+}
