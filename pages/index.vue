@@ -15,18 +15,10 @@
 </template>
 
 <script>
-import NavigationBar from '../components/navigation/NavigationBar.vue';
 export default {
   components: {
-    NavigationBar
-},
+  },
   methods: {
-    recordClicked: function() {
-      alert('Record: Clickerty click ee aw ee aw')
-    },
-    streamClicked: function() {
-      alert('Stream')
-    }
   }
 }
 </script>
