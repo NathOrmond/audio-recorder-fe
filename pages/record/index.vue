@@ -13,30 +13,35 @@
 
       <div 
       v-if="state === State.RECORDING" 
-      class="recording_container"> 
-        
+      class="recording_container"
+      >  
         <AppButton 
         label="Stop Recording"
         alt_text="Click button to stop recording"
         @handleClicked="stopClicked"
         />
-
       </div>
 
 
       <div 
       v-if="state === State.POST" 
-      class="stats_container"> 
-        
+      class="stats_container"
+      >  
         <div>
           <!-- Display response: Duration, sample rate etc. -->
           <h1>RESPONSE:</h1>
-          <h2 
+          <div 
+          v-if="response === undefined"
+          >
+            <h2>Awaiting...</h2>
+          </div>
+          <div 
           v-if="response !== undefined"
           >
-          {{response}}
-          </h2>
-        </div>  
+            <h2>{{response.data}}</h2>
+          </div>      
+        </div> 
+
         <div>
           <AppButton 
             label="Reset"
@@ -68,25 +73,69 @@ const State = Object.freeze({ PRIOR: 1, RECORDING: 2, POST: 3 });
       console.log('Mounted!')
     },
     methods: {
+      getAudioMediaDevices: async function(){ 
+        if((!this.hasAudioPermissions) || (this.streamBeingCaptured === undefined)){ 
+          try {
+            if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) throw new Error(this.userMediaErrorMessage);
+            this.streamBeingCaptured = await navigator.mediaDevices.getUserMedia({ audio: true });
+          } catch(e) { 
+            console.log(e)
+            if (e.message.includes(this.userMediaErrorMessage)) {       
+                    console.log("To record audio, use browsers like Chrome and Firefox.");
+            }
+          }
+        }
+      },
+      createMediaRecorder: function(){ 
+        try { 
+          this.mediaRecorder = new MediaRecorder(this.streamBeingCaptured);     
+          this.mediaRecorder.ondataavailable = (e) => {
+              this.audioBlobs.push(e.data);
+              this.isDataAvailable = true;
+          };
+          this.mediaRecorder.onstart = () => {
+            console.log('Media Recorder Started!');
+            this.isDataAvailable = false;
+          }
+          this.mediaRecorder.onstop = () => { 
+            console.log('Media Recorder Stopped');
+          }
+        } catch(e) { 
+          console.log(e);
+        }
+      },
+      startAudioRecorder: function(){ 
+        try { 
+          if(this.mediaRecorder !== undefined) this.mediaRecorder.start();
+        } catch(e) { 
+          console.log(e);
+        }
+      },
+      stopAudioRecorder: async function(){ 
+        try { 
+          if(this.mediaRecorder !== undefined) this.mediaRecorder.stop();
+        } catch(e){ 
+          console.log(e);
+        }
+      },
+      blobToBase64: function(blob) {
+        return new Promise((resolve, _) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(blob);
+        });
+      },
       /**
       * Begin recording audio here 
       * Record audio in browser
       */
       recordClicked: async function() {
         this.state = State.RECORDING;
-        try {
-          if(this.recorder === undefined){
-            let stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            this.recorder = new MediaRecorder(stream);
-            this.recorder.ondataavailable = (e) => {
-              this.audioData.push(e.data);
-            };
-          }
-          this.recorder.start();
-        } catch (err) {
-          /* handle the error */
-          console.log(err);
+        if(this.mediaRecorder === undefined){
+          await this.getAudioMediaDevices();
+          this.createMediaRecorder();
         }
+        this.startAudioRecorder();        
       }, 
       /**
       * Stop recording audio here 
@@ -96,55 +145,64 @@ const State = Object.freeze({ PRIOR: 1, RECORDING: 2, POST: 3 });
       */
       stopClicked: async function(){ 
         this.state = State.POST;
-        if(this.recorder !== undefined) this.recorder.stop();
-        let audioBlob = new Blob( this.audioData, { 'type': 'audio/mp3;' });
-        let audioFormData = new FormData();
-        audioFormData.append('audio', audioBlob); 
+        this.stopAudioRecorder();
+        let count = 0;
+        while(!this.isDataAvailable && (count <= 10)){
+          console.log(`Awaiting data availalbe: ${count}`);
+          await this.sleep(1000);
+          count++;
+        }
+        
+        if(this.isDataAvailable){
+          let base64data = await this.blobToBase64(new Blob( this.audioBlobs , { 'type': this.mediaRecorder.mimeType})); 
+          try{
+            // Note axios only supports sending data in params on GET so use POST/PUT
+            // See debate: https://github.com/rotki/rotki/issues/576
+              this.response =  await axios({
+                method: "post",
+                url: `/api/${this.urlEndpoints.record.mapping}`,
+                data: base64data,
+                headers: { "Content-Type": "text/plain" },
+              })
+          } catch(e) { 
+            console.log(e);
+          }
 
-        console.log('HERE!')
-        // TODO: TEST API - REMOVE LATER
-        this.response = await axios.get(`/api/${this.urlEndpoints.record.mapping}`);
-
-        // try{
-        //   // Note axios only supports sending data in params on GET so use POST/PUT
-        //   // See debate: https://github.com/rotki/rotki/issues/576
-        //   this.response =  await axios({
-        //     method: "post",
-        //     url: `${this.urlEndpoints.url}/${this.urlEndpoints.record.mapping}`,
-        //     data: audioFormData,
-        //     headers: { "Content-Type": "multipart/form-data" },
-        //   })
-        // } catch(e) { 
-        //   console.log(e);
-        // }
-
-        /**
-        * Expected response format: 
-        * Duration, sample rate etc)
-        * {
-        *  "audio_received": bool, 
-        *  "duration": TIMESTAMP, 
-        *  sample_rate: long
-        * }
-        */
-        console.log(this.response);
+          console.log('RESPONSE:')
+          if(this.response !== undefined) console.log(this.response.data);
+        } else { 
+          this.response = {
+            "data": "Audio Data Never Became Available"
+          }
+          console.log(this.response);
+        }
       },
       /**
       * Reset any global vars here
       */
       finishClicked: function(){ 
         this.state = State.PRIOR;
-        this.audioData = [];
-      }
+        this.audioBlobs = [];
+        this.response = undefined;
+        this.mediaRecorder = undefined;
+        this.streamBeingCaptured = undefined;
+      },
+      sleep: function(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      },
     }, 
     data() { 
       return { 
+        mediaRecorder: undefined,
+        audioBlobs: [], 
+        streamBeingCaptured: undefined,
         State,
         state: State.PRIOR,
-        recorder: undefined,
-        audioData: [], 
         response: undefined,
-        urlEndpoints: urls
+        urlEndpoints: urls,
+        userMediaErrorMessage: 'mediaDevices API or getUserMedia method is not supported in this browser.',
+        hasAudioPermissions: false,
+        isDataAvailable: false
       }
     }
   }

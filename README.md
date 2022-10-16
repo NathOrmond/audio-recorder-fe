@@ -2,6 +2,11 @@
 
 > Front end for audio recorder project
 
+**Note** There are some issues (https://github.com/webpack/webpack/issues/14532#issuecomment-947012063) with npm version (17+) that make it incompatible 
+with certain commends like `npm run dev` - please set npm to version 16.  
+
+This can be done by using `nvm use 16` if you have nvm installed. 
+If you do not do this then you will encounter issues running the project locally for development purposes.
 
 
 ## Build and Run with NPM
